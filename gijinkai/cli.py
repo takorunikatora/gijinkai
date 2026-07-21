@@ -159,5 +159,12 @@ def version():
     console.print(f"gijinkai v{__version__}")
 
 
+@app.command()
+def gui():
+    """Launch the desktop GUI."""
+    from gijinkai.gui import launch_gui
+    launch_gui()
+
+
 if __name__ == "__main__":
     app()
