@@ -106,7 +106,7 @@ def dir(
         return
 
     # Group by language
-    table = Table(title=f"Gijinkaid {len(results)} file(s)")
+    table = Table(title=f"Gijinkai — {len(results)} file(s)")
     table.add_column("File", style="cyan")
     table.add_column("Lang", width=12)
     table.add_column("Before", justify="right", style="dim")

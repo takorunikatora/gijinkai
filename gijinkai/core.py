@@ -388,18 +388,37 @@ def _strip_block_docs(text: str, rules: LangRules) -> str:
         re.IGNORECASE,
     )
 
+    def _is_docstring_context(text_before: str) -> bool:
+        """True if triple-quote appears in a docstring position (after def/class or module top)."""
+        stripped = text_before.rstrip()
+        if not stripped:
+            return True  # module-level
+        # Docstring: after class/def line, optional colon + newline
+        if re.search(r'(?:class|def)\s+\w+[\w\[\],\s]*\s*:\s*$', stripped):
+            return True
+        # Assignment or function argument: NOT a docstring
+        if re.search(r'[=(,]\s*$', stripped):
+            return False
+        # Return, yield: NOT a docstring
+        if re.search(r'(?:return|yield)\s+$', stripped):
+            return False
+        return False
+
     def _should_strip(match: re.Match) -> bool:
         body = match.group(1).strip()
         first_line = body.split("\n")[0].strip()
         if start_re.match(first_line):
             return True
-        # Multi-paragraph verbose block = likely AI
-        if body.count("\n") >= 3 and len(body) > 200:
-            return True
         return False
 
     def _replacer(match: re.Match) -> str:
-        return "" if _should_strip(match) else match.group(0)
+        if not _should_strip(match):
+            return match.group(0)
+        # Check context: is this actually a docstring?
+        text_before = text[: match.start()]
+        if _is_docstring_context(text_before):
+            return ""
+        return match.group(0)
 
     return rules.block_doc_re.sub(_replacer, text)
 
