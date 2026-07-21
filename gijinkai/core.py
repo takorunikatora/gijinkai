@@ -47,6 +47,9 @@ class LangRules:
     # Type annotations (aggressive only)
     strip_type_hints: Callable[[str], str] | None = None
 
+    # Comment-prose rewriting — filler phrases, hedging (aggressive only)
+    rewrite_comment_prose: Callable[[str, str], str] | None = None
+
 
 # ── Python ─────────────────────────────────────────────────────────────────
 
@@ -64,6 +67,24 @@ PYTHON_AI_DOC_STARTS = (
     "Command-line interface for",
     "Entry point for",
     "Package metadata",
+    # blader/humanizer-inspired: formulaic AI docstring openers
+    "A simple",
+    "Convenience function",
+    "Convenience method",
+    "Helper function",
+    "Helper method",
+    "Utility function",
+    "A utility",
+    "The \\w+ function",
+    "The \\w+ class",
+    "Takes \\w+",
+    "Given a",
+    "Given the",
+    "Returns the",
+    "Computes the",
+    "Constructor for",
+    "Factory for",
+    "Manager for",
 )
 
 PYTHON_DROP_LINES = (
@@ -78,7 +99,19 @@ PYTHON_OBVIOUS_COMMENTS = re.compile(
     r"create\s(a\s|the\s|new\s)|check\s(if\s|whether\s)?|"
     r"loop\sthrough|iterate\s(through|over)|"
     r"this\s(function|method|class|module)\s(is|does|takes|returns|handles|provides|will|should)|"
-    r"end\s(if|for|while|function|method|class)"
+    r"end\s(if|for|while|function|method|class)|"
+    # blader/humanizer Pattern 20: chatbot artifacts
+    r"I hope this|Let me know|Feel free|Would you like|Should I\s|Want me to|"
+    r"you'd like|you would like|"
+    # blader/humanizer Pattern 22: sycophantic tone
+    r"Great question|Excellent point|You're absolutely right|That's a great|"
+    # blader/humanizer Pattern 21: knowledge-cutoff disclaimers
+    r"[Aa]s of (my knowledge|my training|\w+ \d{2,4})|"
+    r"[Bb]ased on (available information|my training|the information)|"
+    r"[Nn]ot (extensively|publicly|widely) (documented|available)|"
+    r"[Mm]ay not be (fully |completely )?accurate|"
+    # blader/humanizer Pattern 25: generic positive endings
+    r"Happy coding|Enjoy!|Cheers!|Have fun|Good luck"
     r")",
     re.IGNORECASE,
 )
@@ -90,6 +123,51 @@ PYTHON_PRAGMA_RE = re.compile(
 )
 
 PYTHON_SHEBANG_RE = re.compile(r"^#!.*python")
+
+
+def _rewrite_comment_prose(comment_prefix: str, text: str) -> str:
+    """Rewrite AI prose patterns inside comment text. Aggressive mode only.
+
+    Based on blader/humanizer patterns 23 (filler phrases), 24 (hedging),
+    8 (copula avoidance), 9 (negative parallelisms), 10 (rule of three).
+    """
+    pairs = [
+        # Pattern 23: filler phrases
+        (r"(?i)in order to ", "to "),
+        (r"(?i)due to the fact that ", "because "),
+        (r"(?i)it is important to note that ", ""),
+        (r"(?i)it should be noted that ", ""),
+        (r"(?i)at this point in time ", "now "),
+        (r"(?i)in the event that ", "if "),
+        (r"(?i)has the ability to ", "can "),
+        (r"(?i)is able to ", "can "),
+        (r"(?i)is capable of ", "can "),
+        (r"(?i)for the purpose of ", "for "),
+        (r"(?i)with regard to ", "about "),
+        (r"(?i)in terms of ", "for "),
+        (r"(?i)a number of ", "several "),
+        # Pattern 24: excessive hedging
+        (r"(?i)could potentially possibly ", "may "),
+        (r"(?i)potentially could ", "may "),
+        (r"(?i)it is possible that ", ""),
+        (r"(?i)it could be argued that ", ""),
+        (r"(?i)some might argue that ", ""),
+        # Pattern 8: copula avoidance
+        (r"(?i)\bserves as (?:a |an )", "is a "),
+        (r"(?i)\bServes as (?:a |an )", "Is a "),
+        # Pattern 9: tailing negations
+        (r"(?i), no guessing\.?", "."),
+        (r"(?i), no questions asked\.?", "."),
+        (r"(?i), no exceptions\.?", "."),
+        # Pattern 10: rule-of-three flag words (keep the comment but this is a signal)
+        (r"(?i)fast, reliable, and secure", "fast and reliable"),
+        (r"(?i)simple, fast, and efficient", "fast and efficient"),
+        (r"(?i)robust, scalable, and flexible", "robust and scalable"),
+    ]
+    result = text
+    for pat, repl in pairs:
+        result = re.sub(pat, repl, result)
+    return result
 
 
 def _strip_python_types(text: str) -> str:
@@ -118,6 +196,7 @@ PYTHON = LangRules(
     pragma_re=PYTHON_PRAGMA_RE,
     shebang_re=PYTHON_SHEBANG_RE,
     strip_type_hints=_strip_python_types,
+    rewrite_comment_prose=_rewrite_comment_prose,
 )
 
 # ── JavaScript / TypeScript ────────────────────────────────────────────────
@@ -182,6 +261,7 @@ JAVASCRIPT = LangRules(
     divider_re=JS_DIVIDER_RE,
     pragma_re=JS_PRAGMA_RE,
     shebang_re=JS_SHEBANG_RE,
+    rewrite_comment_prose=_rewrite_comment_prose,
 )
 
 TYPESCRIPT = LangRules(
@@ -196,6 +276,7 @@ TYPESCRIPT = LangRules(
     pragma_re=JS_PRAGMA_RE,
     shebang_re=JS_SHEBANG_RE,
     strip_type_hints=_strip_ts_types,
+    rewrite_comment_prose=_rewrite_comment_prose,
 )
 
 # ── HTML ───────────────────────────────────────────────────────────────────
@@ -306,6 +387,7 @@ SHELL = LangRules(
     obvious_comment_re=SHELL_OBVIOUS_COMMENTS,
     divider_re=SHELL_DIVIDER_RE,
     shebang_re=SHELL_SHEBANG_RE,
+    rewrite_comment_prose=_rewrite_comment_prose,
 )
 
 # ── Rule lookup ────────────────────────────────────────────────────────────
@@ -349,6 +431,7 @@ class Mode:
     remove_shebangs: bool = False
     remove_version_author: bool = False
     normalize_whitespace: bool = True
+    rewrite_comment_prose: bool = False  # aggressive: filler phrases, hedging
 
 
 def mode_light() -> Mode:
@@ -370,6 +453,7 @@ def mode_aggressive() -> Mode:
         remove_type_hints=True,
         remove_shebangs=True,
         remove_version_author=True,
+        rewrite_comment_prose=True,
     )
 
 
@@ -393,8 +477,8 @@ def _strip_block_docs(text: str, rules: LangRules) -> str:
         stripped = text_before.rstrip()
         if not stripped:
             return True  # module-level
-        # Docstring: after class/def line, optional colon + newline
-        if re.search(r'(?:class|def)\s+\w+[\w\[\],\s]*\s*:\s*$', stripped):
+        # Docstring: after class/def line
+        if re.search(r'(?:class|def)\s+\w+.*:\s*$', stripped):
             return True
         # Assignment or function argument: NOT a docstring
         if re.search(r'[=(,]\s*$', stripped):
@@ -494,6 +578,23 @@ def gijinkai(text: str, rules: LangRules, mode: Mode) -> str:
             kept.append(result)
 
     text = "\n".join(kept)
+
+    # Phase 2.5: rewrite comment prose — filler phrases, hedging (aggressive)
+    # Based on blader/humanizer patterns 8, 9, 10, 23, 24
+    if mode.rewrite_comment_prose and rules.rewrite_comment_prose:
+        prefix = rules.line_comment_prefix
+        if prefix:
+            new_lines: list[str] = []
+            for line in text.split("\n"):
+                idx = line.find(prefix)
+                if idx >= 0:
+                    before = line[:idx]
+                    comment = line[idx:]
+                    new_comment = rules.rewrite_comment_prose(prefix, comment)
+                    new_lines.append(before + new_comment if before.strip() else new_comment)
+                else:
+                    new_lines.append(line)
+            text = "\n".join(new_lines)
 
     # Phase 3: type hints (aggressive)
     if mode.remove_type_hints and rules.strip_type_hints:
