@@ -44,9 +44,15 @@ Gijinkai scrubs AI fingerprints from source code through **six language-aware ru
 
 ### Desktop GUI
 
-Neon-dark interface with mode selector, results table, and side-by-side diff preview.
+Neon-dark interface with a three-mode selector, colour-coded results table, and side-by-side diff preview.
 
 ![Gijinkai desktop GUI](docs/screenshot-gui.png)
+
+### CLI
+
+Coloured terminal output with a per-file breakdown (before → after, bytes reclaimed) and a unified summary.
+
+![Gijinkai CLI](docs/screenshot-cli.png)
 
 ## Quick Start
 
